@@ -2,52 +2,75 @@ import threading
 import queue
 
 
-def create_workers(outbox, inbox):
-    # create 25 workers
-    for _ in range(25):
-        t = threading.Thread(target=worker, args[outbox, inbox])
-        t.daemon = True
-        t.start()
-
-    print("created 25 workers.")
-
-
+# https://docs.python.org/3/library/threading.html
 def worker(outbox, inbox):
     while True:
-        item = outbox.get()
+        try:  # Remove and return an item from the queue.
+            item = outbox.get_nowait()
+        # if a thread finds the queue empty, the function returns and the
+        # thread exits
+        except queue.Empty:
+            return
 
-        result = do_something(item)
+        task_result = do_something(item)
 
-        print("worker input was " + str(item) + ", result put in inbox was "
-              + str(result))
-
-        inbox.put(result)
+        # after putting the results in the inbox, the worker will go get another
+        # item from the outbox to do work on
+        inbox.put(task_result)
         outbox.task_done()
 
 
 def do_something(some_item):
-    # put your task to do here
+    # put your slow script here!
     return some_item + 1
 
 
 # DRIVER CODE
-# example just adds 1 to each number in this list
 some_data = [0, 1, 2, 3, 4]
 items = len(some_data)
 
-q = queue.Queue(items + 1)
-q_inbox = queue.Queue(items + 1)
+# Constructor for FIFO queues
+q = queue.Queue(items)
+q_inbox = queue.Queue(items)
 
-print("doing " + str(items) + " requests...")
+print("{} items in the queue...".format(items))
 
+# Put item into the queue.
 for num in some_data:
     q.put(num)
 
-create_workers(q, q_inbox)
+
+# a dict to keep track of our threads for later
+workers = 2
+threads = {}
+
+print("Starting {} workers...".format(workers))
+
+for i in range(workers):
+    # target is the callable object to be invoked by the run() method.
+    threads[i] = threading.Thread(target=worker, args=[q, q_inbox])
+    # A thread can be flagged as a “daemon thread”. The significance of
+    # this flag is that the entire Python program exits when only daemon threads are left.
+    # Checkout https://stackoverflow.com/questions/190010/daemon-threads-explanation
+    # to determine if you want daemon threads enabled(probably NO)
+    threads[i].daemon = False
+
+    # Start the thread’s activity.
+    threads[i].start()
+
+# .join() Blocks until all items in the queue have been gotten and processed.
+# The count of unfinished tasks goes up whenever an item is added to the queue.
+# The count goes down whenever a consumer thread calls task_done() to indicate
+# that the item was retrieved and all work on it is complete.
 q.join()
 
+# Wait until the thread terminates. This example does not need it, but this will
+# ensure all your threads terminate, or help you find bugs
+for val in threads.values():
+    val.join()
+
+# extract results of our multithreading app
 for result in list(q_inbox.queue):
-    # print the results
     print(result)
 
 print("done.")
