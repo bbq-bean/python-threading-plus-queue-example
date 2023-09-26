@@ -2,6 +2,10 @@ import threading
 import queue
 
 
+def do_something(some_item):
+    # put your slow script here!
+    return some_item + 1
+
 # https://docs.python.org/3/library/threading.html
 def worker(outbox, inbox):
     while True:
@@ -18,11 +22,6 @@ def worker(outbox, inbox):
         # item from the outbox to do work on
         inbox.put(task_result)
         outbox.task_done()
-
-
-def do_something(some_item):
-    # put your slow script here!
-    return some_item + 1
 
 
 # DRIVER CODE
